@@ -18,6 +18,10 @@ egui = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 image = { workspace = true }
+# clapp: the Clatch control pipe, the agent's socket and the run-only-under-Clatch bootstrap;
+# core only (`standalone` keeps the CLATCH_STANDALONE dev hatch). tokio runs both beside eframe.
+clappkit = { path = "../../clappkit", default-features = false, features = ["standalone"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 
 [build-dependencies]
 # Icon + VERSIONINFO for gridcraft.exe; build.rs only uses it when the target is Windows.

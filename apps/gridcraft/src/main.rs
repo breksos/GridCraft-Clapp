@@ -5,11 +5,14 @@
 //! `--control <port>` (or `GRIDCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control
 //! server: `{"id":1,"method":"ui.inspect","params":{}}` → `{"id":1,"ok":true,"result":…}`.
 //! See `gridcraft_ui_egui::control` and `docs/control-protocol.md` for the methods.
-#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
+// clapp: no `windows_subsystem = "windows"`. This one binary is also the agent's CLI
+// (`gridcraft <verb>`), and a GUI-subsystem image has no console to print to; Clatch starts the
+// window with CREATE_NO_WINDOW, so no console shows (clappkit/src/role.rs).
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 #[cfg(target_os = "macos")]
 mod apple_events;
+mod clapp;
 mod control_server;
 #[cfg(any(target_os = "windows", test))]
 mod graphics;
@@ -25,21 +28,32 @@ use gridcraft_engine::Session;
 use gridcraft_ui_egui::{Services, SheetApp};
 use serde_json::json;
 
-struct App(SheetApp, #[cfg(target_os = "macos")] Option<native_menu::NativeMenu>, #[cfg(target_os = "macos")] fmv_macos_events::Inbox);
+/// The app and, clapp: what tells the agent about the person's actions.
+struct App(
+    SheetApp,
+    clapp::signals::Observer,
+    #[cfg(target_os = "macos")] Option<native_menu::NativeMenu>,
+    #[cfg(target_os = "macos")] fmv_macos_events::Inbox,
+);
 
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(target_os = "macos")]
         {
-            if self.1.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
-                self.1 = Some(native_menu::NativeMenu::install(ctx));
+            if self.2.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
+                self.2 = Some(native_menu::NativeMenu::install(ctx));
             }
-            if let Some(m) = &self.1 {
+            if let Some(m) = &self.2 {
                 m.poll(&mut self.0, ctx);
             }
-            apple_events::poll(&self.2, &mut self.0, ctx);
+            apple_events::poll(&self.3, &mut self.0, ctx);
         }
+        // clapp: the agent's requests run inside `logic` (its control poll), the person's actions
+        // everywhere else; what changed between a settle and the next observe was the person's.
+        self.1.observe(&self.0);
         self.0.logic(ctx);
+        self.1.settle(&self.0);
+        self.1.tick(&mut self.0, ctx);
         self.0.poll_printing(ctx);
         if ctx.input(|input| input.viewport().close_requested()) && self.0.printing.busy() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -74,6 +88,10 @@ impl eframe::App for App {
 }
 
 fn config_dir() -> Option<std::path::PathBuf> {
+    // clapp: under Clatch, the app's data directory, which uninstalling can erase whole.
+    if let Some(dir) = clapp::settings_dir() {
+        return Some(dir);
+    }
     if cfg!(target_os = "macos") {
         std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join("Library/Application Support/GridCraft"))
     } else if cfg!(windows) {
@@ -215,7 +233,26 @@ fn icon() -> Option<egui::IconData> {
     Some(egui::IconData { width: img.width(), height: img.height(), rgba: img.into_raw() })
 }
 
+// clapp: one binary, two roles (`clapp/mod.rs`). `gridcraft app` (or a file, or nothing) is the
+// window, which runs only under Clatch; `gridcraft <verb>` is the agent's CLI.
 fn main() -> eframe::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match clapp::role(&args) {
+        clapp::Role::Version => {
+            println!("GridCraft {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
+        clapp::Role::Cli(args) => clapp::cli::main(args),
+        clapp::Role::Gui(args) => {
+            if clapp::must_relaunch() {
+                return Ok(());
+            }
+            window(args, clapp::wiring::start())
+        }
+    }
+}
+
+fn window(args: Vec<String>, wiring: clapp::wiring::Wiring) -> eframe::Result<()> {
     // First, so the panic hook and every start-up warning are recorded (`logging`).
     let logger = logging::install();
     // Commands catch their panics (`Session::execute`), but the default hook only prints to
@@ -236,7 +273,6 @@ fn main() -> eframe::Result<()> {
             let _ = std::io::Write::write_fmt(&mut std::io::stderr(), format_args!("gridcraft: {report}\n"));
         }
     }));
-    let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("GridCraft {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
@@ -328,6 +364,9 @@ fn main() -> eframe::Result<()> {
     // The app waits here until a start gets as far as creating it; a start that fails before
     // (no graphics adapter, device or surface) leaves it here for the next attempt.
     let pending = std::cell::Cell::new(Some(app));
+    // clapp: the queue the agent's requests arrive on, taken by the start that creates the app.
+    let clapp::wiring::Wiring { rx: clapp_rx, tx: clapp_tx, ctx: clapp_ctx, control: clapp_control } = wiring;
+    let clapp_rx = std::cell::Cell::new(Some(clapp_rx));
     let run = |options: eframe::NativeOptions| {
         eframe::run_native(
             "GridCraft",
@@ -337,14 +376,27 @@ fn main() -> eframe::Result<()> {
                     return Err("the app was already created".into());
                 };
                 SheetApp::setup_context_for_language(&cc.egui_ctx, app.ui.dark, app.ui.language);
+                // clapp: the agent's requests and upstream's own `--control` port share one queue.
+                let _ = clapp_ctx.set(cc.egui_ctx.clone());
+                app.control_rx = clapp_rx.take();
                 if let Some(port) = control_port {
                     match control_server::start(port, cc.egui_ctx.clone()) {
-                        Ok(rx) => app.control_rx = Some(rx),
+                        Ok(rx) => {
+                            let tx = clapp_tx.clone();
+                            let _ = std::thread::Builder::new().name("control-relay".into()).spawn(move || {
+                                for req in rx {
+                                    if tx.send(req).is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                        }
                         Err(e) => log::error!("control channel on port {port}: {e}"),
                     }
                 }
                 Ok(Box::new(App(
                     app,
+                    clapp::signals::Observer::new(clapp_control.clone()),
                     #[cfg(target_os = "macos")]
                     None,
                     #[cfg(target_os = "macos")]

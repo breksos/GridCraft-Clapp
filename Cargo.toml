@@ -2,6 +2,8 @@
 resolver = "3"
 members = ["crates/*", "apps/*", "xtask"]
 default-members = ["crates/*", "apps/gridcraft", "apps/gridcraft-cli", "xtask"]
+# clapp: clappkit is a submodule with its own workspace; a path dependency, never a member.
+exclude = ["clappkit"]
 
 [workspace.package]
 version = "0.6.1"

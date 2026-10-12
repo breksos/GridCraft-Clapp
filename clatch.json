@@ -3,26 +3,94 @@
   "type": "clapp",
   "id": "com.arfium.gridcraft",
   "name": "GridCraft",
-  "description": "Spreadsheets you and your agent build together: GridCraft, with a CLI into its live window.",
-  "about": "GridCraft, the open-source spreadsheet written in Rust, with a second pair of hands. You work in its window as you always would: formulas, tables, charts, PivotTables, conditional formatting, real .xlsx files. Your agent works on the same workbook through its own commands: it reads the sheets, runs any of GridCraft's commands on them, looks at the window as a picture, puts pictures in, and opens, saves and exports files. Its changes land on the same undo history as yours. It can never close a workbook you have not saved, or change the app's preferences. GridCraft is by ArtCraft (github.com/storytold/gridcraft), under the MIT or Apache-2.0 licence; this is Arfium's fork of it, whose control port also requires a key.",
-  "tags": ["spreadsheet", "xlsx", "data", "agent"],
+  "description": "Spreadsheets you and your agent work on together: GridCraft, with a CLI into its live window.",
+  "about": "GridCraft, the open-source spreadsheet written in Rust, with a second pair of hands. You work in its window as you always would: formulas, tables, charts, PivotTables, conditional formatting, real .xlsx files. Your agent works on the same workbook through its own commands: it reads ranges, enters values and formulas, runs any of GridCraft's commands, and opens, saves and exports files, and every change shows in your window as it happens, on the same undo history as yours. It keeps up with you, too: what you edit and what you select reach it, so 'fix this block' means the block you selected. It can never close or overwrite work you have not saved, or change the app's preferences. GridCraft is by ArtCraft (github.com/storytold/gridcraft), under the MIT or Apache-2.0 licence; this is Arfium's fork of it.",
+  "tags": [
+    "spreadsheet",
+    "xlsx",
+    "data",
+    "agent"
+  ],
   "version": "0.1.0",
   "protocol": 2,
   "icon": "assets/icon.png",
   "launch": {
     "macos": "bin/gridcraft",
-    "args": ["app"]
+    "windows": "bin/gridcraft.exe",
+    "args": [
+      "app"
+    ]
   },
   "connector": {
     "cli": "gridcraft",
     "cliBin": "bin/gridcraft",
     "commands": [
-      { "name": "doc", "about": "read the open workbook, or take a picture of a sheet - changes nothing" },
-      { "name": "window", "about": "read the window's state, or take a picture of it - changes nothing" },
-      { "name": "command", "about": "list GridCraft's commands and what each takes - changes nothing" },
-      { "name": "run", "about": "run one of GridCraft's commands on the open workbook; never files or preferences" },
-      { "name": "file", "about": "new, open, save, export, close, and insert pictures - the only group that touches your disk" },
-      { "name": "ui", "about": "click, type and press keys in the window, as a person would" }
+      {
+        "name": "state",
+        "about": "the open workbooks, the sheet in front and the selection - changes nothing"
+      },
+      {
+        "name": "read",
+        "about": "read a range's values or formulas - changes nothing"
+      },
+      {
+        "name": "commands",
+        "about": "list GridCraft's commands and what each takes - changes nothing"
+      },
+      {
+        "name": "shot",
+        "about": "take a picture of the window - changes nothing"
+      },
+      {
+        "name": "set",
+        "about": "enter a value or formula in a cell"
+      },
+      {
+        "name": "write",
+        "about": "enter a block of values"
+      },
+      {
+        "name": "run",
+        "about": "run one of GridCraft's commands on the open workbook; never files or preferences"
+      },
+      {
+        "name": "new",
+        "about": "open a new workbook"
+      },
+      {
+        "name": "open",
+        "about": "open a workbook from your disk"
+      },
+      {
+        "name": "save",
+        "about": "save the workbook to your disk as .xlsx"
+      },
+      {
+        "name": "export",
+        "about": "write a copy as PDF, CSV, TSV or HTML to your disk"
+      },
+      {
+        "name": "insert",
+        "about": "put a picture from your disk onto the sheet"
+      },
+      {
+        "name": "focus",
+        "about": "bring the window to the front"
+      },
+      {
+        "name": "close",
+        "about": "quit GridCraft, only while nothing is unsaved"
+      }
+    ],
+    "signals": [
+      {
+        "id": "changed",
+        "type": "context"
+      },
+      {
+        "id": "selected",
+        "type": "buffered"
+      }
     ]
   }
 }
