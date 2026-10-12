@@ -6,8 +6,7 @@ Start the desktop app with a control port:
 gridcraft --control 7979            # or GRIDCRAFT_CONTROL_PORT=7979
 ```
 
-Then send newline-delimited JSON to `127.0.0.1:7979`. Every request line gets one reply line, and
-every request carries the window's key (see [Keys](#keys)):
+Then send newline-delimited JSON to `127.0.0.1:7979`. Every request line gets one reply line:
 
 ```json
 {"id": 1, "method": "engine.execute", "params": {"command": "cell.set", "params": {"cell": "B2", "input": "=SUM(A1:A9)"}}}
@@ -15,26 +14,6 @@ every request carries the window's key (see [Keys](#keys)):
 ```
 
 Errors come back as `{"id": …, "ok": false, "error": "…"}`.
-
-## Keys
-
-clapp: ported from WordCraft and DeckCraft, which already work this way. Any local program, and a
-web page through `fetch`, can reach a loopback port, so every request needs the window's key. Once
-the port is bound, the app writes a random key (256 bits, as hex) to
-`<settings>/control-key.<instance>` (mode 0600 on Unix) and removes it when the window closes; a
-new start writes a new key. `<settings>` is `~/Library/Application Support/GridCraft` on macOS,
-`%APPDATA%\GridCraft` on Windows, `$XDG_CONFIG_HOME/gridcraft` elsewhere; `<instance>` is the
-Flatpak instance id inside Flatpak and `local-<port>` otherwise.
-
-- Send the key as top-level `"key"` with every request, or once per connection with
-  `{"method": "auth", "key": "…"}`. A missing or wrong key gets `{"ok": false, "error":
-  "unauthorized"}` and the connection is closed.
-- A line that isn't JSON gets one error and closes the connection, so an HTTP request sent to the
-  port cannot carry a command in its body. A line over 64 MiB is refused the same way. A
-  connection with no authorised request within 30 s is closed.
-- `gridcraft-cli mcp --connect` and `gridcraft-cli send` take the key from
-  `GRIDCRAFT_CONTROL_KEY`, or else from the key file for the port they connect to, and send it only
-  to loopback addresses.
 
 ## Methods
 
@@ -58,8 +37,6 @@ Flatpak instance id inside Flatpak and `local-<port>` otherwise.
 | `ui.set` | `{dark?, formulaBar?, ribbonCollapsed?, animations?}` | UI preferences (`formulaBar` runs `view.formulaBar`) |
 | `ui.resize` / `ui.focus` | `{width, height}` | Window control |
 | `app.open` / `app.save` / `app.quit` | `{path, password?}` / `{path?}` | Files and lifetime. `password` opens a password-protected workbook; without it, such a workbook returns an error (never a dialog) |
-| `app.closeOnDisconnect` (clapp) | — | Answered by the transport itself: this connection becomes a lifeline, and when it ends, for any reason, the window gets `app.close`. The clapp's launcher holds one for its whole life |
-| `app.close` (clapp) | — | Close the window without losing work: unlike `app.quit`, which closes without asking (as the window's own close button does), a workbook with unsaved changes, or a cell being edited, gets the app's own Save Changes question and the window stays open; `{closed, asking?}` |
 
 Any other method name that is a command id (e.g. `home.bold`) runs that command.
 

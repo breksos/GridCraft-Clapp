@@ -4,7 +4,7 @@
 # full-bleed; the tile is still cut along its own edges, as in the other Craft clapps, so a
 # padded upstream render later cannot slip through, and brought back to 1024 x 1024.
 set -eu
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 python3 - "$ROOT/assets/app-icon/gridcraft-1024.png" "$ROOT/assets/icon.png" <<'PY'
 import sys
 from PIL import Image

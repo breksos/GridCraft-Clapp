@@ -25,25 +25,19 @@ use gridcraft_engine::Session;
 use gridcraft_ui_egui::{Services, SheetApp};
 use serde_json::json;
 
-/// The app and, clapp: the control server's key file, removed on exit.
-struct App(
-    SheetApp,
-    Option<control_server::KeyFile>,
-    #[cfg(target_os = "macos")] Option<native_menu::NativeMenu>,
-    #[cfg(target_os = "macos")] fmv_macos_events::Inbox,
-);
+struct App(SheetApp, #[cfg(target_os = "macos")] Option<native_menu::NativeMenu>, #[cfg(target_os = "macos")] fmv_macos_events::Inbox);
 
 impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(target_os = "macos")]
         {
-            if self.2.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
-                self.2 = Some(native_menu::NativeMenu::install(ctx));
+            if self.1.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
+                self.1 = Some(native_menu::NativeMenu::install(ctx));
             }
-            if let Some(m) = &self.2 {
+            if let Some(m) = &self.1 {
                 m.poll(&mut self.0, ctx);
             }
-            apple_events::poll(&self.3, &mut self.0, ctx);
+            apple_events::poll(&self.2, &mut self.0, ctx);
         }
         self.0.logic(ctx);
         self.0.poll_printing(ctx);
@@ -66,10 +60,6 @@ impl eframe::App for App {
     fn on_exit(&mut self) {
         print::finish_pending_jobs();
         save_prefs(&self.0);
-        // clapp: before macOS's `exit` below.
-        if let Some(key_file) = &self.1 {
-            key_file.remove();
-        }
         // macOS (#117): end the process here, before eframe tears the window down. AccessKit's
         // macOS adapter subclasses the window's content view and restores its class on teardown;
         // AppKit's Touch Bar support observes that view (KVO), so in the next display cycle
@@ -347,17 +337,14 @@ fn main() -> eframe::Result<()> {
                     return Err("the app was already created".into());
                 };
                 SheetApp::setup_context_for_language(&cc.egui_ctx, app.ui.dark, app.ui.language);
-                // clapp: the control port takes a key, written to the settings folder.
-                let mut key_file = None;
-                if let Some(port) = control_port
-                    && let Some((rx, file)) = control_server::start(port, cc.egui_ctx.clone(), gridcraft_control_key::settings_dir().as_deref())
-                {
-                    app.control_rx = Some(rx);
-                    key_file = file;
+                if let Some(port) = control_port {
+                    match control_server::start(port, cc.egui_ctx.clone()) {
+                        Ok(rx) => app.control_rx = Some(rx),
+                        Err(e) => log::error!("control channel on port {port}: {e}"),
+                    }
                 }
                 Ok(Box::new(App(
                     app,
-                    key_file,
                     #[cfg(target_os = "macos")]
                     None,
                     #[cfg(target_os = "macos")]

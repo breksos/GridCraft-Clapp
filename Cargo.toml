@@ -24,8 +24,6 @@ gridcraft-engine = { path = "crates/engine" }
 gridcraft-ui-egui = { path = "crates/ui-egui" }
 gridcraft-mcp = { path = "crates/mcp" }
 gridcraft-pdf = { path = "crates/pdf" }
-# clapp: the control key file, shared by the app and the MCP bridge.
-gridcraft-control-key = { path = "crates/control-key" }
 
 # foundation
 thiserror = "2"

@@ -379,26 +379,6 @@ pub fn handle(app: &mut SheetApp, ctx: &egui::Context, method: &str, p: &Json) -
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             ok(Json::Null)
         }
-        // clapp: close the window without losing work. GridCraft's own close (and `app.quit`)
-        // throws away unsaved changes without asking, so while a workbook has some, or a cell is
-        // being edited, this asks the person with the app's own Save Changes question for it and
-        // leaves the window open; with nothing unsaved it closes.
-        "app.close" => {
-            let editing = app.editor.is_some().then(|| app.session.active_index());
-            match editing.or_else(|| app.session.documents().iter().position(|d| d.is_dirty())) {
-                None => {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    ok(json!({"closed": true}))
-                }
-                Some(i) => {
-                    app.session.set_active(i);
-                    let title = app.session.active().map(|d| d.display_title());
-                    app.open_dialog("saveChanges", json!({"title": title}));
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-                    ok(json!({"closed": false, "asking": title}))
-                }
-            }
-        }
         // Anything else that names a command runs it.
         other if gridcraft_engine::find_command(other).is_some() => wrap(app.run(other, p.clone())),
         other => err(format!("unknown method `{other}`")),
