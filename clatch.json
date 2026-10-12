@@ -1,0 +1,28 @@
+{
+  "manifestVersion": 1,
+  "type": "clapp",
+  "id": "com.arfium.gridcraft",
+  "name": "GridCraft",
+  "description": "Spreadsheets you and your agent build together: GridCraft, with a CLI into its live window.",
+  "about": "GridCraft, the open-source spreadsheet written in Rust, with a second pair of hands. You work in its window as you always would: formulas, tables, charts, PivotTables, conditional formatting, real .xlsx files. Your agent works on the same workbook through its own commands: it reads the sheets, runs any of GridCraft's commands on them, looks at the window as a picture, puts pictures in, and opens, saves and exports files. Its changes land on the same undo history as yours. It can never close a workbook you have not saved, or change the app's preferences. GridCraft is by ArtCraft (github.com/storytold/gridcraft), under the MIT or Apache-2.0 licence; this is Arfium's fork of it, whose control port also requires a key.",
+  "tags": ["spreadsheet", "xlsx", "data", "agent"],
+  "version": "0.1.0",
+  "protocol": 2,
+  "icon": "assets/icon.png",
+  "launch": {
+    "macos": "bin/gridcraft",
+    "args": ["app"]
+  },
+  "connector": {
+    "cli": "gridcraft",
+    "cliBin": "bin/gridcraft",
+    "commands": [
+      { "name": "doc", "about": "read the open workbook, or take a picture of a sheet - changes nothing" },
+      { "name": "window", "about": "read the window's state, or take a picture of it - changes nothing" },
+      { "name": "command", "about": "list GridCraft's commands and what each takes - changes nothing" },
+      { "name": "run", "about": "run one of GridCraft's commands on the open workbook; never files or preferences" },
+      { "name": "file", "about": "new, open, save, export, close, and insert pictures - the only group that touches your disk" },
+      { "name": "ui", "about": "click, type and press keys in the window, as a person would" }
+    ]
+  }
+}

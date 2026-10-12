@@ -58,6 +58,7 @@ Flatpak instance id inside Flatpak and `local-<port>` otherwise.
 | `ui.set` | `{dark?, formulaBar?, ribbonCollapsed?, animations?}` | UI preferences (`formulaBar` runs `view.formulaBar`) |
 | `ui.resize` / `ui.focus` | `{width, height}` | Window control |
 | `app.open` / `app.save` / `app.quit` | `{path, password?}` / `{path?}` | Files and lifetime. `password` opens a password-protected workbook; without it, such a workbook returns an error (never a dialog) |
+| `app.close` (clapp) | — | Close the window without losing work: unlike `app.quit`, which closes without asking (as the window's own close button does), a workbook with unsaved changes, or a cell being edited, gets the app's own Save Changes question and the window stays open; `{closed, asking?}` |
 
 Any other method name that is a command id (e.g. `home.bold`) runs that command.
 

@@ -8,3 +8,7 @@ plan/
 /.claude/
 /target-*/
 /craft-fonts/
+
+# clapp: the depot and its package are derived, never committed.
+/pkg/
+*.clapp
