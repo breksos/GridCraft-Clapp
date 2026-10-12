@@ -29,6 +29,8 @@ pub const TABLE: &[(&str, Class)] = &[
     ("core", Class::Layer(0)),
     ("numfmt", Class::Layer(0)),
     ("pdf", Class::Layer(0)),
+    // clapp: the control port's key file, shared by the app and the MCP bridge; depends on nothing.
+    ("control-key", Class::Layer(0)),
     ("formula", Class::Layer(1)),
     ("functions", Class::Layer(1)),
     ("model", Class::Layer(2)),

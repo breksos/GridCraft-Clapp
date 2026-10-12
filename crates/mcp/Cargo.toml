@@ -12,3 +12,5 @@ workspace = true
 gridcraft-engine = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
+# clapp: the bridge sends the app's control key.
+gridcraft-control-key = { workspace = true }
