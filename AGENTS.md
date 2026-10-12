@@ -1,9 +1,9 @@
 # GridCraft — instructions for agents
 
-> **clapp:** this is Arfium's fork of GridCraft as a clapp. The agent's CLI into the live
-> window, the launcher Clatch starts and every fork-only file are described in
-> [clapp/README.md](clapp/README.md), including the short list of upstream files it patches.
-> Everything below is upstream's own guidance and still applies.
+> **clapp:** this is Arfium's fork of GridCraft as a Clatch app: one binary whose window is
+> the person's and whose CLI (`gridcraft <verb>`) is the agent's. How it works, the commands
+> (`npm run verify`, `npm run pack`) and the short list of upstream files it patches are in
+> [CLAPP.md](CLAPP.md). Everything below is upstream's own guidance and still applies.
 
 GridCraft is a clean-room, open-source, Rust-native spreadsheet targeting Microsoft Excel parity — and superiority (speed, openness, agent control). It runs natively on macOS, Windows, Linux and BSD, and on the web via WASM. Siblings with the same conventions: `../designcraft` (InDesign-class, the closest reference), `../photocraft` (Photoshop), `../vectorcraft` (Illustrator), `../pdfcraft` (Acrobat), `../filmcraft` (Premiere), `../lightcraft` (Lightroom), `../effectcraft` (After Effects).
 

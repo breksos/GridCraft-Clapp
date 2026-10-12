@@ -1,0 +1,118 @@
+# Cut a distributable release. Push a version tag and this builds one `.clapp` per
+# platform and publishes them as GitHub Release assets, so users install with no checkout:
+#
+#   clatch install <owner>/<repo>            # latest release
+#   clatch install <owner>/<repo>@v0.1.0     # a specific tag
+#   clatch install github.com/<owner>/<repo> # the URL form, same thing
+#
+# ONE DEPOT PER PLATFORM, because a `.clapp` is per-OS-arch: the Windows depot's manifest
+# carries `connector.cliBin: bin/<cli>.exe` and the macOS one points into the .app bundle.
+# scripts/lib.sh does those rewrites and package.sh refuses to finish if the manifest and
+# the files disagree.
+#
+# macOS and Windows only — same as CI, and for the same reason. Nothing published here is
+# built anywhere else, so a platform we do not build is a platform we do not ship.
+#
+# NOTHING TO CONFIGURE: clappkit is a public submodule and depends on nothing private, so a
+# runner builds this with no secret, no submodule token and no key.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # A tag is the normal trigger; this re-runs a release build without moving one.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and upload to (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write # gh release create / upload
+
+jobs:
+  clapp:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+            target: macos-arm64
+          - os: windows-latest
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+
+      # MSVC, deliberately: GridCraft's Windows build (wgpu, DirectX 12) is the MSVC one, and
+      # this workflow ships no runtime DLLs beside the exe.
+      - name: Assert the Windows host toolchain is MSVC
+        if: matrix.os == 'windows-latest'
+        run: |
+          set -eu
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          echo "host: $host"
+          case "$host" in
+            *-msvc) ;;
+            *) echo "::error::$host is not MSVC; the release is built and tested with the MSVC toolchain"; exit 1 ;;
+          esac
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Stop Defender scanning the build (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}","$env:USERPROFILE\.cargo","$env:USERPROFILE\.rustup" -ErrorAction SilentlyContinue
+          Write-Host "excluded: workspace, ~/.cargo, ~/.rustup"
+
+      - name: Use bash for npm scripts (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm config set script-shell bash
+
+      - name: Build to pkg/
+        run: bash scripts/package.sh
+
+      - name: Smoke-test the packaged binary
+        run: sh .github/smoke.sh
+
+      - name: Pack the host .clapp (+ sha256)
+        run: |
+          set -eu
+          id=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("clatch.json","utf8")).id)')
+          clapp="${id}-${{ matrix.target }}.clapp"
+          # Git Bash on the Windows runner has no `zip`; it does have 7z. Both produce the
+          # same thing — a zip rooted at clatch.json, which is all a .clapp is.
+          if command -v zip >/dev/null 2>&1; then
+            ( cd pkg && zip -r -q "../$clapp" . -x '*.DS_Store' )
+          else
+            ( cd pkg && 7z a -tzip -bso0 -bsp0 "../$clapp" . )
+          fi
+          [ -s "$clapp" ] || { echo "::error::the .clapp is empty"; exit 1; }
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "$clapp" > "$clapp.sha256"
+          else
+            sha256sum "$clapp" > "$clapp.sha256"
+          fi
+          echo "CLAPP=$clapp" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" --title "$TAG" --generate-notes || true
+          gh release upload "$TAG" "$CLAPP" "$CLAPP.sha256" --clobber

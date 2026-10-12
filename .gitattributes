@@ -1,0 +1,12 @@
+# One rule, for the reason that matters: scripts/*.sh run under Git Bash on Windows, and a
+# script checked out with CRLF fails there with `$'\r': command not found` — a error whose
+# message names nothing that is actually wrong. Everything text keeps LF in the repo.
+* text=auto eol=lf
+
+# Binary, so git never "fixes" them.
+*.png binary
+*.icns binary
+*.ico binary
+*.clapp binary
+*.ttf binary
+*.woff2 binary

@@ -1,0 +1,113 @@
+# GridCraft as a clapp
+
+This repository is [GridCraft](https://github.com/storytold/gridcraft) (remote `upstream`), made
+into a Clatch app on [clappkit](clappkit/README.md), the way
+[template-clapp](https://github.com/arfium/template-clapp) builds one. Upstream's own docs and
+rules (`AGENTS.md`, `docs/`) still apply; this page is only what the fork adds.
+
+## How it fits together
+
+One binary, two roles, one state (clappkit `docs/architecture.md`):
+
+```text
+person ─ clicks, keys ──▶ GridCraft window ─┐
+                                            ├─▶ Session (the workbook) ─ one undo history
+agent ── gridcraft <verb> ─▶ ~/.gridcraft/gridcraft.sock ─┘
+Clatch ◀── control pipe: register, signals ── the window
+```
+
+- `gridcraft app` is the window Clatch launches. It runs only under Clatch: started any other
+  way it asks Clatch to start it (`CLATCH_STANDALONE=1` runs it without, for development).
+- `gridcraft <verb>` is the agent's CLI. A request arrives on clappkit's socket and becomes a
+  request on the queue GridCraft's own control channel feeds, so it runs through the same
+  `SheetApp::run` the ribbon does, and the window shows it as it happens.
+- Under Clatch, settings and logs live in `CLATCH_DATA_DIR`, which uninstalling can erase.
+
+All of it is in [`apps/gridcraft/src/clapp/`](apps/gridcraft/src/clapp/mod.rs):
+
+| file | is |
+|---|---|
+| `mod.rs` | which role a launch is; the bootstrap |
+| `cli.rs` | the verbs and `gridcraft help`, the agent's only manual |
+| `door.rs` | the window's side of the socket: each verb as GridCraft control methods |
+| `rules.rs` | what an agent never does here |
+| `signals.rs` | what the person does, told to the agent |
+| `wiring.rs` | the control pipe and the socket, on a runtime beside eframe |
+
+## The verbs are the grants
+
+Each is declared in `clatch.json` and is its own permission (`Bash(gridcraft <verb>:*)`).
+
+| look | change the workbook | files | the window |
+|---|---|---|---|
+| `state` `read` `commands` `shot` | `set` `write` `run` | `new` `open` `save` `export` `insert` | `focus` `close` |
+
+## Signals: the agent keeps up with the person
+
+| signal | type | carries |
+|---|---|---|
+| `changed` | context | the commands the person ran (and their selection), once they pause for 1.2 s, one notice per burst |
+| `selected` | buffered | the workbook, sheet, selection and active cell (value and formula), latest only, riding the person's next message |
+
+Only the person's actions signal; the agent already knows its own. Within a frame the agent's
+requests run in `SheetApp::logic` (its control poll) and the person's input in `ui`, so the app
+observes before `logic` and settles after it: GridCraft's command journal and the selection say
+what changed in between.
+
+## What was measured, and the rule it became
+
+Found by driving the running app, not by reading its docs:
+
+- **Closing the window throws away unsaved changes without asking** (the close button, Quit,
+  `app.quit`). `gridcraft close` refuses while anything is unsaved or a cell is being edited.
+- **`file.close {force: true}` throws one workbook's changes away.** `run` never sends `file.*`,
+  `app.*`, `automate.*` (a script runs commands past these rules) or `ui.*`, nor the person's
+  preferences (`view.theme`, `view.formulaBar`, the dictionary, protection).
+- **A save with no path on a workbook without a file opens the Save As dialog and answers as if
+  it had saved.** `gridcraft save` refuses that case.
+- **Only .xlsx (and .json) become the workbook's file**; .csv, .tsv, .html and .pdf are copies
+  that leave it unsaved. `save` takes .xlsx/.json; `export` writes the copies.
+- **Switching sheets changes neither the unsaved state nor the undo history.** GridCraft has no
+  off-screen picture of a sheet, so `shot --sheet <n>` shows that sheet for the picture and puts
+  the one in front back.
+- **The control socket's directory may not be a symlink** (clappkit refuses `/tmp` on macOS).
+
+## Upstream patches
+
+Everything new is `apps/gridcraft/src/clapp/`, `clatch.json`, `CLAPP.md`, `bin/`, `scripts/`,
+`package.json`, `.github/`, `.gitattributes`, `assets/icon*.png` and `clappkit`. Upstream files
+carry only these, each marked `clapp:`:
+
+| file | change |
+|---|---|
+| `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the signal observer around `logic`; settings in `CLATCH_DATA_DIR`; no `windows_subsystem` (the CLI needs a console) |
+| `apps/gridcraft/Cargo.toml` | `clappkit` (core only) and `tokio` |
+| `Cargo.toml` | `clappkit` excluded from the workspace (it has its own) |
+| `AGENTS.md` | a pointer to this file |
+| `ATTRIBUTION.md` | rows for `assets/icon.png` and `assets/icon-dock.png` |
+| `.gitignore` | `pkg/` and `*.clapp` |
+| `.github/workflows/` | upstream's removed (they would run on Arfium's Actions minutes); template-clapp's CI (manual) and release (on a `v*` tag) in their place |
+
+## Build, verify, ship
+
+```sh
+git clone --recurse-submodules https://github.com/breksos/GridCraft-Clapp.git
+npm run verify          # build -> package -> clatch validate -> CLI <-> window round-trip
+npm run pack            # pkg/ -> com.arfium.gridcraft-<os>-<arch>.clapp
+CLATCH_STANDALONE=1 cargo run -p gridcraft -- app    # the window, without Clatch
+```
+
+`npm run check` checks that `clatch.json`, the CLI's verbs and help, and the emitted signals
+agree. `cargo xtask ci` is upstream's own gate. `pkg/` and `*.clapp` are build output, never
+committed. Push a `v*` tag and the release workflow publishes one `.clapp` per platform, so
+`clatch install breksos/GridCraft-Clapp` works.
+
+Based on GridCraft's `main` at workspace version 0.6.1.
+
+## Not done yet
+
+- **Unsaved work on `clatch stop`.** The protocol says a wired app exits when Clatch stops it
+  or its pipe drops, and GridCraft exits without asking, so unsaved changes are lost then.
+- **Under a live Clatch.** Verified against a stand-in for the daemon's pipe; `clatch install`,
+  `run` and `stop` still to be checked on a running daemon.
+- **Windows** is built by the workflows but not yet run.

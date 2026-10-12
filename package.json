@@ -1,0 +1,15 @@
+{
+  "name": "gridcraft-clapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GridCraft as a Clatch app: its egui window for the person and a CLI for the agent, over one workbook.",
+  "scripts": {
+    "build": "scripts/build.sh",
+    "test": "cargo test -p gridcraft",
+    "check": "node scripts/check-manifest.mjs",
+    "verify": "scripts/verify.sh",
+    "package": "scripts/package.sh",
+    "validate": "scripts/validate.sh",
+    "pack": "scripts/pack.sh"
+  }
+}

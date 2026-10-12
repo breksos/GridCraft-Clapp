@@ -1,0 +1,103 @@
+# CI: does this still compile, test and package on the platforms we ship?
+#
+# macOS and Windows — the two we publish, and the two the manifest claims. The OS keys in
+# `launch` ARE the advertised platforms (clappkit/docs/format.md § Distribution), so a
+# platform nothing here builds is a platform the manifest must not name.
+#
+# ONE JOB PER PLATFORM. The manifest check and the keyless-resolution proof ride along on
+# macOS rather than taking a third runner, and Release triggers on tags only — so no
+# platform is ever built twice for one push.
+#
+# Nothing to configure: clappkit is a PUBLIC submodule and depends on nothing private, so
+# every job runs on a bare runner with no secret and no key.
+#
+# `clatch validate` needs the private Clatch binary and `npm run verify` needs a desktop
+# session, so both stay local gates. Build + test + package is what CI can honestly assert.
+# NOT RUN AUTOMATICALLY. GitHub Actions minutes are the constraint here, and this family
+# is fifteen repositories: on a private repo a macOS runner bills at 10x, so a push-and-PR
+# gate across all of them burns the allowance faster than it earns anything. The local
+# gate is the real one — `npm run verify` opens a window and proves the two surfaces talk,
+# which no headless runner can do anyway.
+#
+# So this is manual: `gh workflow run CI -R <owner>/<repo>`. Put `push`/`pull_request`
+# back when there is budget for it; nothing else here needs to change.
+name: CI
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash # scripts/*.sh run under Git Bash on windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # clappkit — public, so no token
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+
+      # `cache-on-failure` is the difference between a 15-minute Windows build and a
+      # 2-minute one: without it a build that dies saves nothing, so the next attempt
+      # starts from zero.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      # Defender scans every one of the ~100k files rustc writes; excluding the build
+      # directories is worth roughly a third of the Windows time. The runner is a throwaway.
+      - name: Stop Defender scanning the build (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}","$env:USERPROFILE\.cargo","$env:USERPROFILE\.rustup" -ErrorAction SilentlyContinue
+          Write-Host "excluded: workspace, ~/.cargo, ~/.rustup"
+
+      # `npm run <script>` spawns cmd.exe on Windows, which cannot run a .sh file.
+      - name: Use bash for npm scripts (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm config set script-shell bash
+
+      - name: Manifest agrees with the code
+        if: matrix.os == 'macos-14'
+        run: node scripts/check-manifest.mjs
+
+      # THE PROOF that nothing private is reachable. This runner holds no ssh key, so a
+      # dependency that reached for one would fail on authentication right here. clappkit
+      # used to pull four crates from a private repository, which is what made this check
+      # necessary in the first place. `--locked` adds that the lockfile is honest.
+      #
+      # NOT `--offline`: that also forbids crates.io, which a fresh runner has never
+      # downloaded — it passes locally only because a developer's registry cache is warm.
+      # Offline is the stronger LOCAL check; keyless resolution is the one CI can make.
+      - name: Resolve every dependency with no key
+        if: matrix.os == 'macos-14'
+        run: cargo fetch --locked
+
+      - name: Test
+        run: cargo test --release -p gridcraft
+
+      # Builds the frontend, builds the binary THROUGH the Tauri CLI so the frontend is
+      # embedded rather than fetched from a dev URL, assembles pkg/, and asserts the
+      # manifest and the depot agree.
+      - name: Build to pkg/
+        run: bash scripts/package.sh
+
+      - name: Smoke-test the packaged binary
+        run: sh .github/smoke.sh

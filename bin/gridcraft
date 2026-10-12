@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Dev entrypoint: build if needed, then exec the real binary. In a depot this file IS the
+# compiled binary (scripts/package.sh replaces it), so `launch` and `connector.cliBin` can
+# name one path in both worlds.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+BIN="$ROOT/target/release/gridcraft"
+[ -x "$BIN" ] || "$ROOT/scripts/build.sh" >/dev/null
+exec "$BIN" "$@"
