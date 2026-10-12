@@ -188,6 +188,9 @@ fn serve(stream: TcpStream, tx: Sender<ControlRequest>, ctx: egui::Context, key:
     let mut authorised = false;
     // The key an `auth` request gave this connection.
     let mut conn_key: Option<String> = None;
+    // clapp: a launcher's lifeline. Once this connection asks for it, the window closes the way a
+    // person would when the connection ends, whatever ended the launcher (a stop, a crash, a kill).
+    let mut lifeline = false;
     while let Some(line) = read_line(&mut reader) {
         let line = match line {
             Ok(l) => l,
@@ -242,6 +245,13 @@ fn serve(stream: TcpStream, tx: Sender<ControlRequest>, ctx: egui::Context, key:
             }
             continue;
         }
+        if method == "app.closeOnDisconnect" {
+            lifeline = true;
+            if !reply(json!({"ok": true, "result": {}})) {
+                break;
+            }
+            continue;
+        }
         let (req, rrx) = ControlRequest::new(method, params);
         if tx.send(req).is_err() {
             break;
@@ -252,6 +262,12 @@ fn serve(stream: TcpStream, tx: Sender<ControlRequest>, ctx: egui::Context, key:
             .unwrap_or_else(|_| json!({"ok": false, "error": "timed out waiting for the UI (is the window minimised?)"}));
         if !reply(r) {
             break;
+        }
+    }
+    if lifeline {
+        let (req, _answer) = ControlRequest::new("app.close".to_string(), json!({}));
+        if tx.send(req).is_ok() {
+            ctx.request_repaint();
         }
     }
 }
@@ -433,6 +449,25 @@ mod tests {
         }
         let _ = feeder.join();
         assert!(t0.elapsed() < Duration::from_millis(1500), "{:?}", t0.elapsed());
+    }
+
+    /// clapp: the lifeline's whole contract. Nothing reaches the window while it is held; its end
+    /// asks the window to close as a person would.
+    #[test]
+    fn a_lifeline_that_ends_asks_the_window_to_close() {
+        let (port, rx) = boot();
+        let mut c = Conn::open(port);
+        assert_eq!(c.call(&format!(r#"{{"id":1,"method":"auth","key":"{KEY}"}}"#))["ok"], true);
+        assert_eq!(c.call(r#"{"id":2,"method":"app.closeOnDisconnect"}"#)["ok"], true);
+        assert!(rx.recv_timeout(Duration::from_millis(300)).is_err(), "nothing while it is held");
+        drop(c);
+        let req = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(req.method, "app.close");
+        // A connection that never asked for it closes nothing.
+        let mut plain = Conn::open(port);
+        assert_eq!(plain.call(&format!(r#"{{"id":1,"method":"auth","key":"{KEY}"}}"#))["ok"], true);
+        drop(plain);
+        assert!(rx.recv_timeout(Duration::from_millis(300)).is_err());
     }
 
     #[test]

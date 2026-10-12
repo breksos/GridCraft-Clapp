@@ -33,10 +33,6 @@ const ANSWER_TIMEOUT: Duration = Duration::from_secs(75);
 /// The windows close a control connection idle for 30 s. One idle this long is replaced
 /// before a request is sent on it, so no request is lost into a connection being closed.
 const IDLE: Duration = Duration::from_secs(20);
-/// How long the shutdown hook waits for the window to go, inside clappkit's one second.
-const CLOSE_WAIT: Duration = Duration::from_millis(700);
-/// The shutdown hook's budget for reaching the window at all.
-const CLOSE_REACH: Duration = Duration::from_millis(200);
 /// An answer bigger than this travels as a file: the CLI's socket takes 1 MiB at most.
 const SPILL: usize = 512 << 10;
 
@@ -101,33 +97,32 @@ async fn serve() -> Result<i32> {
         .spawn()
         .with_context(|| format!("cannot start {}", exe.display()))?;
 
-    // Clatch says stop, or its pipe ends: close the window the way a person would, so the app
-    // asks about unsaved work itself. Nothing here may throw that work away.
-    //
-    // clappkit ends this process the moment the hook returns, and gives it a second at most, so
-    // the hook does its own blocking I/O: a hook that only queued the request for a task would
-    // return first, and the window would be left open with nobody minding it.
-    let (exited_tx, exited_rx) = std::sync::mpsc::channel::<()>();
-    let exited_rx = std::sync::Mutex::new(exited_rx);
-    let closer = link.clone();
+    // Clatch says stop, or its pipe ends. The window does not wait for this hook: clappkit answers
+    // Clatch first and runs the hook after, and Clatch kills this process the moment the answer
+    // arrives, so a hook here rarely runs at all. The lifeline below is what closes the window.
     let on_shutdown: clappkit::OnShutdown = Arc::new(move |cause| {
-        eprintln!("{CLI}: {cause}; closing the window");
-        match closer.close_now() {
-            // A window asking about unsaved work stays open past this; the person answers it.
-            Ok(()) => {
-                let _ = exited_rx.lock().map(|rx| rx.recv_timeout(CLOSE_WAIT));
-            }
-            Err(e) => eprintln!("{CLI}: could not ask the window to close: {e}"),
-        }
+        eprintln!("{CLI}: {cause}; the window closes with this launcher, asking about unsaved work first");
     });
     let _control = clappkit::Control::connect_with(clappkit::declared_signals(), on_shutdown).await?;
 
     // Ready once the control port takes our key. Until then every request waits (`Door::wait`).
+    // The lifeline goes up first: from then on, however this process ends, the window closes the
+    // way a person would (`app.closeOnDisconnect`, the clapp's patch to the window's transport).
     let starter = link.clone();
     tokio::spawn(async move {
         let deadline = Instant::now() + START_TIMEOUT;
         while Instant::now() < deadline {
             if starter.ensure().await.is_ok() {
+                match starter.lifeline().await {
+                    Ok((mut read, write, _)) => {
+                        tokio::spawn(async move {
+                            let _held = write;
+                            let mut nothing = String::new();
+                            let _ = read.read_line(&mut nothing).await; // the window's end, if first
+                        });
+                    }
+                    Err(e) => eprintln!("{CLI}: no lifeline to the window ({e}); stopping this launcher will leave it open"),
+                }
                 let _ = ready_tx.send(true);
                 return;
             }
@@ -137,7 +132,6 @@ async fn serve() -> Result<i32> {
     });
 
     let status = child.wait().await?;
-    let _ = exited_tx.send(());
     craft::cleanup(port, &data);
     let _ = std::fs::remove_dir_all(&exchange);
     Ok(status.code().unwrap_or(0))
@@ -230,27 +224,15 @@ impl Link {
         }
     }
 
-    /// Ask the window to close as a person would, from a plain thread and without waiting for
-    /// its answer: the window acts on its next frame, which may come after this process is gone.
-    /// Only the key's acceptance is waited for, and the window's transport gives that at once.
-    fn close_now(&self) -> Result<(), String> {
-        use std::io::{BufRead, Write};
-        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], self.port));
-        let stream = std::net::TcpStream::connect_timeout(&addr, CLOSE_REACH).map_err(|e| e.to_string())?;
-        let _ = stream.set_read_timeout(Some(CLOSE_REACH));
-        let _ = stream.set_write_timeout(Some(CLOSE_REACH));
-        let mut writer = stream.try_clone().map_err(|e| e.to_string())?;
-        let mut reader = std::io::BufReader::new(stream);
-        let mut auth = craft::auth_frame(&self.secret.value()?);
-        auth["id"] = json!("auth");
-        writeln!(writer, "{auth}").map_err(|e| e.to_string())?;
-        let mut reply = String::new();
-        reader.read_line(&mut reply).map_err(|e| e.to_string())?;
-        let accepted = serde_json::from_str::<Value>(reply.trim()).ok().and_then(|r| r.get("ok").and_then(Value::as_bool));
-        if accepted != Some(true) {
-            return Err(format!("the window refused the key: {}", reply.trim()));
+    /// A second connection, held for this process's life and never written to again: when it ends,
+    /// the window closes the way a person would.
+    async fn lifeline(&self) -> Result<Conn, String> {
+        let (mut read, mut write, at) = self.open().await?;
+        let reply = exchange_line(&mut read, &mut write, &json!({"id": "life", "method": "app.closeOnDisconnect"})).await?;
+        if reply.get("ok").and_then(Value::as_bool) != Some(true) {
+            return Err(error_of(&reply));
         }
-        writeln!(writer, "{}", json!({"id": "close", "method": "app.close", "params": {}})).map_err(|e| e.to_string())
+        Ok((read, write, at))
     }
 
     /// [`Self::call`] for `engine.execute`.
