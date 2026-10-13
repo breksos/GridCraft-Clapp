@@ -52,6 +52,8 @@ The window
   gridcraft close                       quit GridCraft; refused while anything is unsaved
 
 Nothing here closes or overwrites unsaved work: that stays the person's decision.
+If GridCraft ends with unsaved changes (stopped, crashed), they reopen at the next launch
+as "<title> (recovered)" workbooks: unsaved, with no file until saved.
 Several workbooks can be open; every verb acts on the one in front, and
 `gridcraft run window.activate '{"index": <n>}'` switches (from 0). Ranges are A1
 references: B2, A1:D10, Sheet2!A1:C3. A path is read from where you run the command.

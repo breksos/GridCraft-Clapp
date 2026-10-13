@@ -7,6 +7,7 @@
 //! - [`cli`]: the verbs and the help, which is the agent's only manual.
 //! - [`door`]: the window's side of the socket: each verb, as GridCraft's own control methods.
 //! - [`rules`]: what an agent may never do here (lose unsaved work, change preferences, ...).
+//! - [`recovery`]: unsaved work kept on disk, and opened again after the window ends.
 //! - [`signals`]: what the person does, told to the agent (`changed`, `selected`).
 //! - [`wiring`]: the control pipe and the socket, on a background runtime beside eframe.
 
@@ -16,6 +17,7 @@
 
 pub mod cli;
 pub mod door;
+pub mod recovery;
 pub mod rules;
 pub mod signals;
 pub mod wiring;

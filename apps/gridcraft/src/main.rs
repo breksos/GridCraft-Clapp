@@ -28,10 +28,12 @@ use gridcraft_engine::Session;
 use gridcraft_ui_egui::{Services, SheetApp};
 use serde_json::json;
 
-/// The app and, clapp: what tells the agent about the person's actions.
+/// The app and, clapp: what tells the agent about the person's actions, and what keeps their
+/// unsaved work.
 struct App(
     SheetApp,
     clapp::signals::Observer,
+    clapp::recovery::Recovery,
     #[cfg(target_os = "macos")] Option<native_menu::NativeMenu>,
     #[cfg(target_os = "macos")] fmv_macos_events::Inbox,
 );
@@ -40,13 +42,13 @@ impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(target_os = "macos")]
         {
-            if self.2.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
-                self.2 = Some(native_menu::NativeMenu::install(ctx));
+            if self.3.is_none() && std::env::var_os("GRIDCRAFT_NO_NATIVE_MENU").is_none() {
+                self.3 = Some(native_menu::NativeMenu::install(ctx));
             }
-            if let Some(m) = &self.2 {
+            if let Some(m) = &self.3 {
                 m.poll(&mut self.0, ctx);
             }
-            apple_events::poll(&self.3, &mut self.0, ctx);
+            apple_events::poll(&self.4, &mut self.0, ctx);
         }
         // clapp: the agent's requests run inside `logic` (its control poll), the person's actions
         // everywhere else; what changed between a settle and the next observe was the person's.
@@ -54,6 +56,8 @@ impl eframe::App for App {
         self.0.logic(ctx);
         self.1.settle(&self.0);
         self.1.tick(&mut self.0, ctx);
+        // clapp: here too, because eframe skips `ui` while the window is hidden or covered.
+        self.2.tick(&mut self.0, ctx);
         self.0.poll_printing(ctx);
         if ctx.input(|input| input.viewport().close_requested()) && self.0.printing.busy() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -70,6 +74,12 @@ impl eframe::App for App {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.0.ui(ui);
+        // clapp: the person's input was handled just now, and an idle window may not draw another
+        // frame for a long time: tell the agent and keep the unsaved work from this frame.
+        let ctx = ui.ctx().clone();
+        self.1.observe(&self.0);
+        self.1.tick(&mut self.0, &ctx);
+        self.2.tick(&mut self.0, &ctx);
     }
     fn on_exit(&mut self) {
         print::finish_pending_jobs();
@@ -397,6 +407,7 @@ fn window(args: Vec<String>, wiring: clapp::wiring::Wiring) -> eframe::Result<()
                 Ok(Box::new(App(
                     app,
                     clapp::signals::Observer::new(clapp_control.clone()),
+                    clapp::recovery::Recovery::new(),
                     #[cfg(target_os = "macos")]
                     None,
                     #[cfg(target_os = "macos")]

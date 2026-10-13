@@ -32,6 +32,7 @@ All of it is in [`apps/gridcraft/src/clapp/`](apps/gridcraft/src/clapp/mod.rs):
 | `door.rs` | the window's side of the socket: each verb as GridCraft control methods |
 | `rules.rs` | what an agent never does here |
 | `signals.rs` | what the person does, told to the agent |
+| `recovery.rs` | unsaved work kept on disk and reopened after the window ends |
 | `wiring.rs` | the control pipe and the socket, on a runtime beside eframe |
 
 ## The verbs are the grants
@@ -53,6 +54,24 @@ Only the person's actions signal; the agent already knows its own. Within a fram
 requests run in `SheetApp::logic` (its control poll) and the person's input in `ui`, so the app
 observes before `logic` and settles after it: GridCraft's command journal and the selection say
 what changed in between.
+
+## Unsaved work is never lost
+
+Under Clatch the window ends whenever Clatch stops it or its pipe drops, and GridCraft quits
+without asking, so unsaved changes used to be gone. [`recovery.rs`](apps/gridcraft/src/clapp/recovery.rs)
+keeps a copy of every workbook with unsaved changes in `<data dir>/recovery/`, written on a
+worker thread within about a second of the last change (every 5 s at most during a long burst).
+Nothing relies on a shutdown hook, which Clatch leaves no time for.
+
+- The next launch reopens each copy as "<title> (recovered)": unsaved, with no file, so saving
+  asks where and never overwrites the original unasked. GridCraft's own message box says what
+  was recovered and from which file.
+- A copy is removed when its workbook is saved, undone back to its saved state, or closed in
+  the app ("Don't Save" included). Quitting the window keeps them: that is the case they are for.
+- Covers a crash too. A copy that cannot be opened is left in place and named in the message.
+
+Measured: changes by the agent and by the person, the pipe cut, relaunch: both came back with
+their formulas, unsaved, and the copy was kept again; saving and "Don't Save" removed it.
 
 ## What was measured, and the rule it became
 
@@ -80,7 +99,7 @@ carry only these, each marked `clapp:`:
 
 | file | change |
 |---|---|
-| `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the signal observer around `logic`; settings in `CLATCH_DATA_DIR`; no `windows_subsystem` (the CLI needs a console) |
+| `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the signal observer and the recovery copies around `logic` and `ui`; settings in `CLATCH_DATA_DIR`; no `windows_subsystem` (the CLI needs a console) |
 | `apps/gridcraft/Cargo.toml` | `clappkit` (core only) and `tokio` |
 | `Cargo.toml` | `clappkit` excluded from the workspace (it has its own) |
 | `AGENTS.md` | a pointer to this file |
@@ -106,8 +125,6 @@ Based on GridCraft's `main` at workspace version 0.6.1.
 
 ## Not done yet
 
-- **Unsaved work on `clatch stop`.** The protocol says a wired app exits when Clatch stops it
-  or its pipe drops, and GridCraft exits without asking, so unsaved changes are lost then.
 - **Under a live Clatch.** Verified against a stand-in for the daemon's pipe; `clatch install`,
   `run` and `stop` still to be checked on a running daemon.
 - **Windows** is built by the workflows but not yet run.
