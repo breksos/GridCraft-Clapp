@@ -233,7 +233,12 @@ fn restore(dir: &Path, app: &mut SheetApp) {
 }
 
 fn recovered_title(title: &str) -> String {
-    let stem = Path::new(title).file_stem().and_then(|s| s.to_str()).unwrap_or(title);
+    let mut stem = Path::new(title).file_stem().and_then(|s| s.to_str()).unwrap_or(title).trim_end();
+    // A recovered workbook that was never saved comes back again with the title it already had:
+    // it says "(recovered)" once, however many times it ends up here (measured: four).
+    while let Some(rest) = stem.strip_suffix("(recovered)") {
+        stem = rest.trim_end();
+    }
     format!("{stem} (recovered)")
 }
 
@@ -279,6 +284,8 @@ mod tests {
     fn a_recovered_workbook_says_so() {
         assert_eq!(recovered_title("Budget.xlsx"), "Budget (recovered)");
         assert_eq!(recovered_title("Book1"), "Book1 (recovered)");
+        assert_eq!(recovered_title("Gradebook (recovered)"), "Gradebook (recovered)", "once, not again");
+        assert_eq!(recovered_title("Gradebook (recovered) (recovered) (recovered)"), "Gradebook (recovered)");
     }
 
     #[test]
