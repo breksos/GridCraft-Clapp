@@ -73,6 +73,15 @@ Nothing relies on a shutdown hook, which Clatch leaves no time for.
 Measured: changes by the agent and by the person, the pipe cut, relaunch: both came back with
 their formulas, unsaved, and the copy was kept again; saving and "Don't Save" removed it.
 
+## Not an ArtCraft product
+
+ArtCraft's brand terms (`docs/brand/LICENSE-brand.txt`) let anyone say, in plain text, that a
+work is based on the app by the ArtCraft team, and ask a published modified version to carry
+none of the ArtCraft marks and never present itself as an ArtCraft product or suggest ArtCraft
+supports it. So this fork has no ArtCraft logos, its About box and menu link this repository
+and upstream's source instead of ArtCraft's site and Discord, and its store text says "based
+on". The app's own name and icon are upstream's MIT/Apache-licensed work (`ATTRIBUTION.md`).
+
 ## Updates come from Clatch
 
 GridCraft can update itself (`craft_update`: a startup check, "Update and Restart", Help ▸ Check
@@ -113,6 +122,8 @@ carry only these, each marked `clapp:`:
 | file | change |
 |---|---|
 | `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the clapp hooks (signals, recovery copies) around `logic` and `ui`, as the last field of `App`; settings in `CLATCH_DATA_DIR`; no self-update under Clatch; no `windows_subsystem` (the CLI needs a console) |
+| `crates/ui-egui/src/dialogs/about.rs`, `apps/gridcraft/src/native_menu.rs` | the About box and Help menu say "based on GridCraft by the ArtCraft team" and link this repository and upstream's source, not ArtCraft's site and Discord |
+| `README.md`, `NOTICE`, `ATTRIBUTION.md`, `docs/brand/` | the ArtCraft logos removed (their terms keep in `docs/brand/LICENSE-brand.txt`) |
 | `crates/ui-egui/src/updates_ui.rs` | `updates_come_from`: under Clatch GridCraft never checks for, offers or installs an update itself; Help ▸ Check for Updates… says updates come from Clatch |
 | `apps/gridcraft/Cargo.toml` | `clappkit` (core only) and `tokio` |
 | `Cargo.toml` | `clappkit` excluded from the workspace (it has its own) |

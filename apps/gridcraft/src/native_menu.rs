@@ -184,8 +184,8 @@ fn tree() -> Vec<(&'static str, Vec<Entry>)> {
                 ("Check for Updates…", "app.checkForUpdates", None),
                 ("Agent Control (MCP)…", "dialog:agents", None),
                 ("Contributors…", "dialog:about:Contributors", None),
-                ("GridCraft on getartcraft.com", "url:https://getartcraft.com/apps/gridcraft", None),
-                ("Join the ArtCraft Discord…", "url:https://discord.gg/artcraft", None),
+                // clapp: this modified version's own page; not ArtCraft's (docs/brand/LICENSE-brand.txt).
+                ("GridCraft Clapp on GitHub", "url:https://github.com/breksos/GridCraft-Clapp", None),
             ],
         ),
     ]
