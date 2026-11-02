@@ -64,6 +64,35 @@ pub fn must_relaunch() -> bool {
     }
 }
 
+/// What the window runs around each frame for Clatch: the agent hears what the person does, and
+/// unsaved work is kept on disk. `main.rs` calls [`Hooks::observe`] before `SheetApp::logic` and
+/// after `ui`, [`Hooks::settle`] after `logic`, and [`Hooks::tick`] after both.
+pub struct Hooks {
+    observer: signals::Observer,
+    recovery: recovery::Recovery,
+}
+
+impl Hooks {
+    pub fn new(control: std::sync::Arc<std::sync::OnceLock<clappkit::Control>>) -> Hooks {
+        Hooks { observer: signals::Observer::new(control), recovery: recovery::Recovery::new() }
+    }
+    pub fn observe(&mut self, app: &gridcraft_ui_egui::SheetApp) {
+        self.observer.observe(app);
+    }
+    pub fn settle(&mut self, app: &gridcraft_ui_egui::SheetApp) {
+        self.observer.settle(app);
+    }
+    pub fn tick(&mut self, app: &mut gridcraft_ui_egui::SheetApp, ctx: &egui::Context) {
+        self.observer.tick(app, ctx);
+        self.recovery.tick(app, ctx);
+    }
+}
+
+/// Whether Clatch launched this window.
+pub fn wired() -> bool {
+    std::env::var_os("CLATCH_INSTANCE_TOKEN").is_some_and(|t| !t.is_empty())
+}
+
 /// Where the window keeps its settings and logs under Clatch: the app's data directory, which
 /// uninstalling can erase whole. `None` outside Clatch, where upstream's own folder stays.
 pub fn settings_dir() -> Option<std::path::PathBuf> {

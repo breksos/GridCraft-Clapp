@@ -73,6 +73,13 @@ Nothing relies on a shutdown hook, which Clatch leaves no time for.
 Measured: changes by the agent and by the person, the pipe cut, relaunch: both came back with
 their formulas, unsaved, and the copy was kept again; saving and "Don't Save" removed it.
 
+## Updates come from Clatch
+
+GridCraft can update itself (`craft_update`: a startup check, "Update and Restart", Help ▸ Check
+for Updates…). Under Clatch that would rewrite the installed depot behind Clatch's back, so the
+window never checks, offers or installs an update there; the menu item says to update in
+Clatch. Outside Clatch, upstream's updater works as before.
+
 ## What was measured, and the rule it became
 
 Found by driving the running app, not by reading its docs:
@@ -82,8 +89,14 @@ Found by driving the running app, not by reading its docs:
 - **`file.close {force: true}` throws one workbook's changes away.** `run` never sends `file.*`,
   `app.*`, `automate.*` (a script runs commands past these rules) or `ui.*`, nor the person's
   preferences (`view.theme`, `view.formulaBar`, the dictionary, protection).
-- **A save with no path on a workbook without a file opens the Save As dialog and answers as if
-  it had saved.** `gridcraft save` refuses that case.
+- **New in 0.15:** `window.close {force}` (a workbook can have several windows) can throw
+  unsaved work away, so it is refused; `formulas.pasteName` types into the cell the person is
+  editing; `view.expandFormulaBar` and `view.statusBar` are preferences. The new namespaces stay
+  out of `run`: `python` (code that runs), `macro` (steps past these rules), `link` (opens a
+  browser), `options`, `app`, `automate`, `ui`. `equation` (editing an equation) is reached.
+- **A save with no path on a workbook without a file opens the Save As dialog**: before 0.15 it
+  answered as if it had saved; since, the native dialog blocks the whole window until someone
+  answers it. `gridcraft save` refuses that case.
 - **Only .xlsx (and .json) become the workbook's file**; .csv, .tsv, .html and .pdf are copies
   that leave it unsaved. `save` takes .xlsx/.json; `export` writes the copies.
 - **Switching sheets changes neither the unsaved state nor the undo history.** GridCraft has no
@@ -99,13 +112,14 @@ carry only these, each marked `clapp:`:
 
 | file | change |
 |---|---|
-| `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the signal observer and the recovery copies around `logic` and `ui`; settings in `CLATCH_DATA_DIR`; no `windows_subsystem` (the CLI needs a console) |
+| `apps/gridcraft/src/main.rs` | role dispatch and the bootstrap; the clapp hooks (signals, recovery copies) around `logic` and `ui`, as the last field of `App`; settings in `CLATCH_DATA_DIR`; no self-update under Clatch; no `windows_subsystem` (the CLI needs a console) |
+| `crates/ui-egui/src/updates_ui.rs` | `updates_come_from`: under Clatch GridCraft never checks for, offers or installs an update itself; Help ▸ Check for Updates… says updates come from Clatch |
 | `apps/gridcraft/Cargo.toml` | `clappkit` (core only) and `tokio` |
 | `Cargo.toml` | `clappkit` excluded from the workspace (it has its own) |
 | `AGENTS.md` | a pointer to this file |
 | `ATTRIBUTION.md` | rows for `assets/icon.png` and `assets/icon-dock.png` |
 | `.gitignore` | `pkg/` and `*.clapp` |
-| `.github/workflows/` | upstream's removed (they would run on Arfium's Actions minutes); template-clapp's CI (manual) and release (on a `v*` tag) in their place |
+| `.github/` | upstream's workflows removed, including ones it adds later (FreeBSD, Nix, packaging lint, SonarCloud, Windows ARM64 so far), and its Dependabot configuration: they would run on this fork's Actions minutes or open pull requests here; template-clapp's CI (manual) and release (on a `v*` tag) in their place |
 
 ## Build, verify, ship
 
@@ -121,7 +135,10 @@ agree. `cargo xtask ci` is upstream's own gate. `pkg/` and `*.clapp` are build o
 committed. Push a `v*` tag and the release workflow publishes one `.clapp` per platform, so
 `clatch install breksos/GridCraft-Clapp` works.
 
-Based on GridCraft's `main` at workspace version 0.6.1.
+Based on GridCraft's `main` at workspace version 0.15.0 (upstream `ef927e2e`). Updating: merge
+`upstream/main`, keep this fork's workflows, then re-check every command upstream added inside
+the namespaces `run` reaches (`rules::NAMESPACES`) against the measurements above; a new
+namespace stays out until someone has read it.
 
 ## Not done yet
 

@@ -32,6 +32,7 @@ pub const NAMESPACES: &[&str] = &[
     "data",
     "document",
     "draw",
+    "equation",
     "edit",
     "formulas",
     "history",
@@ -65,6 +66,10 @@ pub const REFUSED: &[(&str, &str)] = &[
     ("view.animations", "animations are the person's preference"),
     ("view.interfaceScale", "the interface size is the person's preference"),
     ("view.collapseRibbon", "the ribbon is the person's to fold"),
+    ("view.expandFormulaBar", "the formula bar's height is the person's preference"),
+    ("view.statusBar", "the status bar's statistics are the person's preference"),
+    ("window.close", "closing a window can throw a workbook's unsaved changes away (`force`): that is the person's call"),
+    ("formulas.pasteName", "it types into the cell the person is editing"),
 ];
 
 /// Parameters that name a file on disk. The same commands take the file's contents instead.
@@ -128,6 +133,12 @@ mod tests {
         assert!(run("ui.printSubmit", &json!({})).is_err());
         assert!(run("view.theme", &json!({"mode": "dark"})).is_err());
         assert!(run("brandNew.thing", &json!({})).is_err(), "an unread namespace stays out");
+        assert!(run("window.close", &json!({"force": true})).is_err(), "force throws away unsaved work");
+        assert!(run("python.set", &json!({"cell": "A1", "code": "1"})).is_err(), "code that runs is the person's call");
+        assert!(run("macro.run", &json!({"name": "x"})).is_err());
+        assert!(run("link.open", &json!({"url": "https://example.com"})).is_err());
+        assert!(run("equation.edit", &json!({"id": 1, "latex": "x^2"})).is_ok());
+        assert!(run("insert.equation", &json!({"latex": "x^2"})).is_ok());
         assert!(run("insert.picture", &json!({"path": "/x/logo.png"})).is_err());
         assert!(run("insert.picture", &json!({"base64": "AAAA"})).is_ok(), "bytes are not a path");
     }

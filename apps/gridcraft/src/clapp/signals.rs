@@ -150,7 +150,7 @@ fn view(app: &SheetApp) -> Option<View> {
     let d = app.session.active()?;
     Some(View {
         workbook: d.display_title(),
-        sheet: d.wb.sheets.get(d.wb.active_sheet).map(|s| s.name.clone()).unwrap_or_default(),
+        sheet: d.wb.active().map(|s| s.name.clone()).unwrap_or_default(),
         selection: d.selection.a1(),
         active: d.selection.active.a1(),
     })

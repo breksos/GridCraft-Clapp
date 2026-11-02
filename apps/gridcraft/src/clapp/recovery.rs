@@ -247,7 +247,8 @@ fn add_unsaved(app: &mut SheetApp, wb: gridcraft_engine::model::Workbook, title:
     {
         s.close_document(0);
     }
-    let mut d = DocState::new(wb, None, title);
+    // Read back from a file on disk: macros in it ask before they run, as a file opened does.
+    let mut d = DocState::new(wb, None, title, gridcraft_engine::Trust::FromFile);
     d.saved = Arc::new((*d.wb).clone());
     s.add_document(d);
 }
