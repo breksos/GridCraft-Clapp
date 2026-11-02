@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "type": "clapp",
-  "id": "com.arfium.gridcraft",
+  "id": "com.breksos.gridcraft",
   "name": "GridCraft",
   "description": "Spreadsheets you and your agent work on together: GridCraft, with a CLI into its live window.",
   "about": "GridCraft, the open-source spreadsheet written in Rust, with a second pair of hands. You work in its window as you always would: formulas, tables, charts, PivotTables, conditional formatting, real .xlsx files. Your agent works on the same workbook through its own commands: it reads ranges, enters values and formulas, runs any of GridCraft's commands, and opens, saves and exports files, and every change shows in your window as it happens, on the same undo history as yours. It keeps up with you, too: what you edit and what you select reach it, so 'fix this block' means the block you selected. It can never close or overwrite work you have not saved, or change the app's preferences. Based on GridCraft by the ArtCraft team (github.com/storytold/gridcraft), under the MIT or Apache-2.0 licence; not an ArtCraft product.",
@@ -11,7 +11,7 @@
     "data",
     "agent"
   ],
-  "version": "0.2.0",
+  "version": "0.1.0",
   "protocol": 2,
   "icon": "assets/icon.png",
   "launch": {

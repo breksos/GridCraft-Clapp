@@ -1,6 +1,6 @@
 {
   "name": "gridcraft-clapp",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "description": "GridCraft as a Clatch app: its egui window for the person and a CLI for the agent, over one workbook.",
   "scripts": {

@@ -137,7 +137,7 @@ carry only these, each marked `clapp:`:
 ```sh
 git clone --recurse-submodules https://github.com/breksos/GridCraft-Clapp.git
 npm run verify          # build -> package -> clatch validate -> CLI <-> window round-trip
-npm run pack            # pkg/ -> com.arfium.gridcraft-<os>-<arch>.clapp
+npm run pack            # pkg/ -> com.breksos.gridcraft-<os>-<arch>.clapp
 CLATCH_STANDALONE=1 cargo run -p gridcraft -- app    # the window, without Clatch
 ```
 
