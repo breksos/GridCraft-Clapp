@@ -2,7 +2,7 @@
 # platform and publishes them as GitHub Release assets, so users install with no checkout:
 #
 #   clatch install <owner>/<repo>            # latest release
-#   clatch install <owner>/<repo>@v0.1.0     # a specific tag
+#   clatch install <owner>/<repo>@clapp-v0.1.0 # a specific tag
 #   clatch install github.com/<owner>/<repo> # the URL form, same thing
 #
 # ONE DEPOT PER PLATFORM, because a `.clapp` is per-OS-arch: the Windows depot's manifest
@@ -19,12 +19,12 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['clapp-v*'] # not `v*`: those names are upstream's releases, fetched with every merge
   # A tag is the normal trigger; this re-runs a release build without moving one.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to build and upload to (e.g. v0.1.0)'
+        description: 'Existing tag to build and upload to (e.g. clapp-v0.1.0)'
         required: true
 
 permissions:

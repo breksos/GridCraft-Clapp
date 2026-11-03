@@ -130,7 +130,7 @@ carry only these, each marked `clapp:`:
 | `AGENTS.md` | a pointer to this file |
 | `ATTRIBUTION.md` | rows for `assets/icon.png` and `assets/icon-dock.png` |
 | `.gitignore` | `pkg/` and `*.clapp` |
-| `.github/` | upstream's workflows removed, including ones it adds later (FreeBSD, Nix, packaging lint, SonarCloud, Windows ARM64 so far), and its Dependabot configuration: they would run on this fork's Actions minutes or open pull requests here; template-clapp's CI (manual) and release (on a `v*` tag) in their place |
+| `.github/` | upstream's workflows removed, including ones it adds later (FreeBSD, Nix, packaging lint, SonarCloud, Windows ARM64 so far), and its Dependabot configuration: they would run on this fork's Actions minutes or open pull requests here; template-clapp's CI (manual) and release (on a `clapp-v*` tag; `v*` names are upstream's) in their place |
 
 ## Build, verify, ship
 
@@ -143,7 +143,7 @@ CLATCH_STANDALONE=1 cargo run -p gridcraft -- app    # the window, without Clatc
 
 `npm run check` checks that `clatch.json`, the CLI's verbs and help, and the emitted signals
 agree. `cargo xtask ci` is upstream's own gate. `pkg/` and `*.clapp` are build output, never
-committed. Push a `v*` tag and the release workflow publishes one `.clapp` per platform, so
+committed. Push a `clapp-v*` tag (for example `clapp-v0.1.0`, the manifest's version) and the release workflow publishes one `.clapp` per platform, so
 `clatch install breksos/GridCraft-Clapp` works.
 
 Based on GridCraft's `main` at workspace version 0.15.0 (upstream `ef927e2e`). Updating: merge
